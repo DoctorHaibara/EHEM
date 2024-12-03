@@ -70,7 +70,7 @@ class DataFolder(data.Dataset):
             cell,mat = self.loader(filename)
             for i in range(cell.shape[1]):
                 data = np.transpose(mat[cell[0,i]]) #shape[ptNum,Kparent, Seq[1],Level[1],Octant[1],Pos[3] ] e.g 123456*7*6
-                data[:,:,0] = data[:,:,0] - 1
+                data[:,:,0] = data[:,:,0] - 1 # Occupancy shift from 1-255 to 0-254
                 a.append(data[:,-levelNumK:,:])# only take levelNumK level feats
                 
             self.dataBuffer = []
