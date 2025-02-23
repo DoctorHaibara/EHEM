@@ -11,3 +11,10 @@ __pycache__
 /Exp
 /Data
 /temp
+*.ply
+*.png
+*.docx
+*.pdf
+*.mp4
+Counts.txt
+rename_files.sh

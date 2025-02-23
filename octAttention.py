@@ -164,11 +164,11 @@ if __name__=="__main__":
     import time
     import os
 
-    epochs = 8 # The number of epochs
+    epochs = 2 # The number of epochs
     best_model = None
     batch_size = 128
     TreePoint = bptt*16
-    train_set = dataset.DataFolder(root=trainDataRoot, TreePoint=TreePoint,transform=None,dataLenPerFile= 391563.61670395226) # you should run 'dataLenPerFile' in dataset.py to get this num (17456051.4)
+    train_set = dataset.DataFolder(root=trainDataRoot, TreePoint=TreePoint,transform=None,dataLenPerFile= 294625.44) # you should run 'dataLenPerFile' in dataset.py to get this num (17456051.4)
     train_loader = data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=False, num_workers=4,drop_last=True) # will load TreePoint*batch_size at one time
     
     # loger
@@ -209,7 +209,7 @@ if __name__=="__main__":
         total_loss_list = torch.zeros((1,7))
             
         for Batch, d in enumerate(train_loader): # there are two 'BATCH', 'Batch' includes batch_size*TreePoint/batchSize/bptt 'batch'es.
-            print(Batch,d)
+            # print(Batch,d)
             batch = 0
             # Batch 是当前的大批次索引
             # reshape((batchSize,-1,4,6))调整至batchSize=32,,K,6
@@ -240,7 +240,7 @@ if __name__=="__main__":
                     total_loss_list = " - "
                     # math.exp(cur_loss) 计算困惑度 (Perplexity, PPL)
                     printl('| epoch {:3d} | Batch {:3d} | {:4d}/{:4d} batches | '
-                        'lr {:02.2f} | ms/batch {:5.2f} | '
+                        'lr {:g} | ms/batch {:5.2f} | '
                         'loss {:5.2f} | losslist  {} | ppl {:8.2f}'.format(
                             epoch, Batch, batch, len(train_data) // bptt, scheduler.get_last_lr()[0],
                             elapsed * 1000 / log_interval,

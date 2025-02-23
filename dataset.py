@@ -107,7 +107,7 @@ if __name__=="__main__":
     train_set.calcdataLenPerFile()
     for batch, d in enumerate(train_loader):
         data_source = d[0].reshape((batchSize,-1,4,6)).permute(1,0,2,3) #d[0] for geometry,d[1] for attribute
-        print(batch,data_source.shape)
+        # print(batch,data_source.shape)
         # print(data_source[:,0,:,0])
         # print(d[0][0],d[0].shape)
 # %%
