@@ -9,7 +9,7 @@ import torch
 import os,random
 import numpy as np
 # torch.set_default_tensor_type(torch.DoubleTensor)
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Network parameters

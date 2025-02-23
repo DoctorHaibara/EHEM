@@ -37,16 +37,47 @@ def dataPrepare(fileName,saveMatDir='Data',qs=1,ptNamePrefix='',offset='min',qle
     if qlevel is not None:
         qs = (points.max() - points.min())/(2**qlevel-1)
 
-    pt = np.round(points/qs)
-    pt,idx = np.unique(pt,axis=0,return_index=True)
+    pt = np.round(points/qs) # qs = 1
+    pt,idx = np.unique(pt,axis=0,return_index=True) # 去除重复点，保证点云唯一性
     pt = pt.astype(int)
     # pointCloud.write_ply_data('pori.ply',np.hstack((pt,c)),attributeName=['reflectance'],attriType=['uint16'])
-    code,Octree,QLevel = GenOctree(pt)
-    DataSturct = GenKparentSeq(Octree,4)
+    # 生成八叉树结构
+    code,Octree,QLevel = GenOctree(pt) 
+    
+    # 生成祖先序列
+    # Seq：(nodeNum, K) 的NumPy数组 其中nodeNum为八叉树节点的数量
+    # 每个元素包含其一个祖先/自己的编码（0-255）
+
+    # Level: 一个形状为 (nodeNum, K, 2) 的NumPy数组。存储每个节点每个祖先的层级和卦限信息
+    # LevelOctant[i, j, 0] 包含节点 i 的祖先 j 的层级编号（从 1 开始）。i==j时就是自己的level
+    # LevelOctant[i, j, 1] 包含该祖先在其父节点中的卦限编号（1-8）
+
+
+    # ChildID: 记录每个节点的 子节点 ID。
+
+    # Pos: 一个形状为 (nodeNum, K, 3) 的NumPy数组。它存储每个节点每个祖先的3D坐标
+    DataSturct = GenKparentSeq(Octree,4) 
     
     ptcloud = {'Location':refPt}
+    # Info 结构体：qs：量化步长。offset：平移偏移量。Lmax：八叉树深度。name：点云名称。levelSID：每个八叉树层级的 ID。
+    # levelSID	八叉树每层最后一个节点的 ID（用于层级索引）
     Info = {'qs':qs,'offset':offset,'Lmax':QLevel,'name':ptName,'levelSID':np.array([Octreelevel.node[-1].nodeid for Octreelevel in Octree])}
+    
+    # N 为最底一层节点数
+    # DataSturct['Seq']：是二维 (N,K,)，需要 扩展维度：
+    # np.expand_dims(DataSturct['Seq'], 2)  # 变成 (N,K,1)
+    # DataSturct['Level']：已经是 (N,K,2) 形状。
+    # DataSturct['Pos']：形状 (N,K,3)，表示点的坐标。
+    # patchFile = {
+    # 'patchFile': (
+    #     (N, K, 6) 矩阵,  # 八叉树编码数据
+    #     ptcloud,     # 原始点云
+    #     Info         # 量化和八叉树信息
+    # )
+    # }
     patchFile = {'patchFile':(np.concatenate((np.expand_dims(DataSturct['Seq'],2),DataSturct['Level'],DataSturct['Pos']),2), ptcloud, Info)}
+    # 存储 .mat 文件 格式为 MATLAB v7.3
     hdf5storage.savemat(os.path.join(saveMatDir,ptName+'.mat'), patchFile, format='7.3', oned_as='row', store_python_metadata=True)
+    # 反量化，恢复点云坐标
     DQpt = (pt*qs+offset) 
     return os.path.join(saveMatDir,ptName+'.mat'),DQpt,refPt

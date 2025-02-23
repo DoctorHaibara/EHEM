@@ -35,6 +35,7 @@ class DataFolder(data.Dataset):
         for filename in sorted(glob.glob(root)):
             if is_image_file(filename):
                 dataNames.append('{}'.format(filename))
+                print(filename)
         self.root = root
         self.dataNames =sorted(dataNames)
         self.transform = transform
@@ -51,6 +52,7 @@ class DataFolder(data.Dataset):
         
     def calcdataLenPerFile(self):
         dataLenPerFile = 0
+        print(self.fileLen)
         for filename in self.dataNames:
             cell,mat = self.loader(filename)
             for i in range(cell.shape[1]):
@@ -102,7 +104,7 @@ if __name__=="__main__":
     train_set = DataFolder(root=trainDataRoot, TreePoint=TreePoint,transform=None,dataLenPerFile=356484.1) # will load (batch_size,TreePoint,...) shape data
     train_loader = data.DataLoader(dataset=train_set, batch_size=1, shuffle=True, num_workers=4,drop_last=True)
     print('total octrees(TreePoint*7): {}; total batches: {}'.format(len(train_set), len(train_loader)))
-
+    train_set.calcdataLenPerFile()
     for batch, d in enumerate(train_loader):
         data_source = d[0].reshape((batchSize,-1,4,6)).permute(1,0,2,3) #d[0] for geometry,d[1] for attribute
         print(batch,data_source.shape)

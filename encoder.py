@@ -31,10 +31,12 @@ if __name__=="__main__":
             printl('too large!')
             continue
         ptName = os.path.splitext(os.path.basename(oriFile))[0] 
-        for qs in [1]:
+        for qs in [1]: # 遍历不同的量化参数（这里只有1）
             ptNamePrefix = ptName
             matFile,DQpt,refPt = dataPrepare(oriFile,saveMatDir='./Data/testPly',qs=qs,ptNamePrefix='',rotation=False)
             # please set `rotation=True` in the `dataPrepare` function when processing MVUB data
             main(matFile,model,actualcode=True,printl =printl) # actualcode=False: bin file will not be generated
             print('_'*50,'pc_error','_'*50)
+            # PCC quality measurement
+            # PSNR（峰值信噪比）
             pointCloud.pcerror(refPt,DQpt,None,'-r 1023',None).wait()

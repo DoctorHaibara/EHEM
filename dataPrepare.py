@@ -21,7 +21,7 @@ def makedFile(dir):
 if __name__=="__main__":
 
 ######For MPEG,MVUB######    
-    oriDir = '/8iVFBv2/longdress/Ply/*.ply'
+    oriDir = 'file/Ply/2851.ply'
     outDir = 'Data/Obj/train/'
     ptNamePrefix = 'MPEG_' # 'MVUB_'
 
@@ -31,9 +31,9 @@ if __name__=="__main__":
     for n,file in enumerate(fileList):
         fileName = file.split('/')[-1][:-4]
         dataName = outDir+ptNamePrefix+fileName+'.mat'
-        if dataName in makeFileList:   
-            print(dataName,'maked!')
-            continue
+        # if dataName in makeFileList:   
+        #     print(dataName,'maked!')
+        #     continue
         dataPrepare(file,saveMatDir=outDir,ptNamePrefix=ptNamePrefix,offset=0,rotation=False)
         # please set `rotation=True` in the `dataPrepare` function when processing MVUB data
         if n%10==0:
