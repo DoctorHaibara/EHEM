@@ -12,10 +12,10 @@ import math
 import copy
 from networkTool import device
 
-class SelfMultiheadAttention(nn.Module):
+class MultiheadAttention(nn.Module):
 
     def __init__(self, emsize, nhead, dropout=0.5):
-        super(SelfMultiheadAttention, self).__init__()
+        super(MultiheadAttention, self).__init__()
         self.nhead = nhead  # 4
         self.head_size = emsize // nhead  
         assert self.head_size * nhead == emsize, "embed_dim must be divisible by num_heads"
@@ -34,18 +34,28 @@ class SelfMultiheadAttention(nn.Module):
             x = x.permute(0, 2, 1, 3)
         elif (dim == 4):
             x = x.permute(0,1,3,2,4)
-            assert 0
+            # assert 0
         return x
 
     #em.shape = [bptt,batch_size,emsize]  mask.shape=[bptt, bptt]
-    def forward(self,em,mask):
-        em = em.transpose(0,1).contiguous()  
-        Key = self.slice(self.mlpKey(em),em.dim())    
-        Query = self.slice(self.mlpQuery(em),em.dim())  
-        Value = self.slice(self.mlpValue(em),em.dim())
+    def forward(self,query_em, key_value_em,mask):
+        query_em = query_em.transpose(0, 1).contiguous()
+        key_value_em = key_value_em.transpose(0, 1).contiguous()
+
+        # 生成Q, K, V
+        Query = self.mlpQuery(query_em)
+        Key = self.mlpKey(key_value_em)
+        Value = self.mlpValue(key_value_em)
+
+        # 分割多头
+        Query = self.slice(Query, query_em.dim())  # [batch, nhead, q_len, head_size]
+        Key = self.slice(Key, key_value_em.dim())  # [batch, nhead, kv_len, head_size]
+        Value = self.slice(Value, key_value_em.dim())
 
         attention_score = torch.matmul(Query, Key.transpose(-1, -2)) / math.sqrt(self.head_size)   
-        attention_score = attention_score + mask #torch.Size([32, 4, 256, 256]) ,mask [[0,-inf,-inf,..],[0,0,-inf,...],[0,0,0,...]]
+        if mask is not None:
+            mask = mask.unsqueeze(0).unsqueeze(0)  # [1, 1, q_len, kv_len]
+            attention_scores = attention_scores + mask
         attention_map = self.dropout(nn.Softmax(dim=-1)(attention_score))
 
         context = torch.matmul(attention_map, Value)        
@@ -62,7 +72,7 @@ class TransformerLayer(nn.Module):
 
     def __init__(self, ninp, nhead, nhid, dropout=0.1):
         super(TransformerLayer, self).__init__()
-        self.MultiAttention = SelfMultiheadAttention(emsize=ninp,nhead=nhead)
+        self.MultiAttention = MultiheadAttention(emsize=ninp,nhead=nhead)
         self.linear1 = nn.Linear(ninp,nhid)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(nhid,ninp)
@@ -73,14 +83,13 @@ class TransformerLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
 
     # src is the integration of leaf node and its ancestors.
-    def forward(self, src, src_mask):
-        src2 = self.MultiAttention(src,src_mask)  #Multi-head Attention
-        src = self.dropout1(src2) + src
-        src = self.norm1(src)
-        src2 = self.linear2(self.dropout(torch.relu(self.linear1(src))))  
-        src = src + self.dropout2(src2)
-        src = self.norm2(src)
-        return src
+    def forward(self, query, key_value, src_mask = None):
+        attn_output = self.MultiAttention(query, key_value,src_mask)  #Multi-head Attention
+        query = self.norm1(attn_output)
+        ff_output = self.linear2(self.dropout(torch.relu(self.linear1(query))))  
+        query = query + self.dropout2(ff_output)
+        query = self.norm2(query)
+        return query
 
 class TransformerModule(nn.Module):
 
@@ -88,9 +97,9 @@ class TransformerModule(nn.Module):
         super(TransformerModule, self).__init__()
         self.layers = torch.nn.ModuleList([copy.deepcopy(layer) for i in range(nlayers)])
 
-    def forward(self,src,src_mask):
-        output = src
+    def forward(self,query, key_value,src_mask = None):
+        output = query
 
         for mod in self.layers:
-            output = mod(output, src_mask=src_mask)
+            output = mod(output, key_value, src_mask)
         return output

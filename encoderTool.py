@@ -14,18 +14,6 @@ from dataset import default_loader as matloader
 import numpyAc
 import tqdm
 
-
-
-def generate_square_subsequent_mask(sz):
-    """
-    生成一个上三角掩码，用于 Transformer 模型中的注意力机制。
-    :param sz: 掩码的大小
-    :return: 生成的掩码矩阵
-    """
-    mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-    return mask
-#%%
  
 '''
 description: Rearrange data for batch processing
@@ -35,29 +23,21 @@ def batchify(oct_seq,bptt,oct_len):
     batchify 主要用于对 oct_seq 进行时间序列上的平移处理，
     同时添加填充数据，并返回一个 dataID 以及扩展维度的 oct_seq。
     """
+    pad_len = int(np.ceil(len(oct_seq)/bptt)*bptt - len(oct_seq))
 
-    # 让 oct_seq 的第 i 行（除最后一行）等于 i+1 行的数据，但只针对 0:-1 列（即不包括最后一列）
-    # 整个矩阵的 0:-1 列沿着第一维节点 (N) 进行了 时间序列上的平移，后面的数据覆盖了前面的数据，类似于队列的滚动更新。
-    oct_seq[:-1,0:-1,:] = oct_seq[1:,0:-1,:]
-    # 确保了 oct_seq 在 最后一列 的 1:3 维度（八叉树层级、象限编号等）也遵循时间序列滚动。
-    oct_seq[:-1,-1,1:3] = oct_seq[1:,-1,1:3]  
-    # 每个节点的所有祖先的占用代码-1
-    oct_seq[:,:,0] = oct_seq[:,:,0] - 1
+    dataID = torch.LongTensor(np.arange(oct_len))
     
-    pad_len = bptt#int(np.ceil(len(oct_seq)/bptt)*bptt - len(oct_seq))
+    # oct_seq 尾部添加 pad_len 行的 0，保证 oct_seq 长度对 bptt 取整
+    # 最终 oct_seq 变成了 (data_len + pad_len, K, 6)，即扩展了 pad_len 维度用于填充
+    oct_seq = torch.Tensor(np.r_[oct_seq,np.zeros((pad_len,*oct_seq.shape[1:]))])
     
-    # oct_seq 头部添加了 bptt 行的 0，尾部添加 pad_len 行的 0，保证 oct_seq 长度对 bptt 取整
-    # 最终 oct_seq 变成了 (N + bptt + pad_len, K, 6)，即扩展了 bptt + pad_len 维度用于填充
-    oct_seq = torch.Tensor(np.r_[np.zeros((bptt,*oct_seq.shape[1:])),oct_seq,np.zeros((pad_len,*oct_seq.shape[1:]))])
-    
-    # dataID 变成了一个 ((N + bptt + pad_len),) 的 LongTensor，其中：
-    # 头部 bptt 个 -1 代表填充部分。
+    # dataID 变成了一个 ((data_len + pad_len),) 的 LongTensor，其中：
     # N 个索引 0, 1, ..., N-1 对应 oct_seq 原始数据部分。
     # 末尾 pad_len 个 -1 代表填充部分。
-    dataID = torch.LongTensor(np.r_[np.ones((bptt))*-1,np.arange(oct_len),np.ones((pad_len))*-1])
+    dataID = torch.LongTensor(np.r_[np.arange(oct_len),np.ones((pad_len))*-1])
     
-    # dataID 变成 (N + bptt + pad_len, 1)，用于标记时间步的索引。
-    # oct_seq 变成 (N + bptt + pad_len, 1, K, 6)，增加 1 维用于批次处理。
+    # dataID 变成 (data_len + pad_len, 1)，用于标记时间步的索引。
+    # oct_seq 变成 (data_len + pad_len, 1, K, 6)，增加 1 维用于批次处理。
     return dataID.unsqueeze(1),oct_seq.unsqueeze(1)
 
 def encodeNode(pro,octvalue):
@@ -98,16 +78,12 @@ def compress(oct_data_seq,outputfile,model,actualcode = True,print=print,showRel
     assert(batch_size*bptt<oct_len)
     
     #%%
-    # 前 bptt 个元素：-1（填充） 中间部分：
-    # 0 到 oct_len-1（点索引） 
-    # 后 pad_len 个元素：-1（填充）
     dataID,padingdata = batchify(oct_data_seq,bptt,oct_len)
     MAX_GPU_MEM_It = 2**13 # you can change this according to the GPU memory size (2**12 for 24G)
     MAX_GPU_MEM = min(bptt*MAX_GPU_MEM_It,dataID.max())+2  #  bptt <= MAX_GPU_MEM -1 < min(MAX_GPU,dataID)
     # 初始化概率张量，形状 (MAX_GPU_MEM, 255)，存储模型输出的 softmax 结果
     pro = torch.zeros((MAX_GPU_MEM,255)).to(device)
     padingLength = padingdata.shape[0]
-    src_mask = generate_square_subsequent_mask(bptt).to(device)
     padingdata = padingdata
     # 存储累计计算时间
     elapsed = 0
@@ -120,14 +96,14 @@ def compress(oct_data_seq,outputfile,model,actualcode = True,print=print,showRel
     else:
         trange = tqdm.trange
     with torch.no_grad():
-        for n,i in enumerate(trange(0, padingLength-bptt , bptt)):
+        for n,i in enumerate(trange(0, padingLength , bptt)):
             # input 形状：(bptt, 1, K, 6)
             input = padingdata[i:i+bptt].long().to(device)   #input torch.Size([256, 32, 4, 3]) bptt,batch_sz,kparent,[oct,level,octant]
-            nodeID = dataID[i+1:i+bptt+1].squeeze(0) - offset
+            nodeID = dataID[i:i+bptt].squeeze(0) - offset
             # nodeID < 0 的部分设为 -1，用于处理填充数据
             nodeID[nodeID<0] = -1
             start_time = time.time()
-            output = model(input,src_mask,[])
+            output = model(input,dataFeat=[])
             elapsed =elapsed+ time.time() - start_time
             output = output.reshape(-1,255)
             nodeID = nodeID.reshape(-1)
@@ -139,7 +115,7 @@ def compress(oct_data_seq,outputfile,model,actualcode = True,print=print,showRel
                 proBit.append(pro[:nodeID.max()+1].detach().cpu().numpy())
                 offset = offset + nodeID.max() +1
 
-    del pro,input,src_mask
+    del pro,input
     torch.cuda.empty_cache()
     # 将 proBit 中的多个数组按行方向堆叠成一个新的二维数组
     proBit = np.vstack(proBit)
