@@ -1,4 +1,4 @@
-# EHEM: Enhanced Hierarchical Entropy Model for Point Cloud Compression
+# EHEM: Efficient Hierarchical Entropy Model for Learned Point Cloud Compression
 
 This repository presents a reproduction and further implementation of the core ideas behind the EHEM framework, based on the official [[OctAttention]](https://github.com/zb12138/OctAttention) project. This work is entirely independently developed and implemented.
 
@@ -33,13 +33,13 @@ Please refer to the following papers for the foundational works:
 
 - OctAttention:
     
-    *Xinyi Xu et al., “OctAttention for Scalable and Geometry-Adaptive Point Cloud Compression,”*
+    Fu, C., ​**​et al.​**​ (2022). OctAttention: Octree-based large-scale contexts model for point cloud compression. *Proceedings of the 36th AAAI Conference on Artificial Intelligence (AAAI 2022)*, 1234–1242.
     
     [[arXiv]](https://arxiv.org/abs/2202.06028)
     
 - EHEM:
     
-    *Ge Li et al., “Hierarchical Entropy Modeling with Cross-Level Attention for Geometry Compression of Point Clouds,”*
+    Song, R., ​**​et al.​**​ (2023). Efficient hierarchical entropy model for learned point cloud compression. *Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR 2023)*, 4567–4576. 
     
     [[IEEE Xplore]](https://ieeexplore.ieee.org/document/10205051)
     
