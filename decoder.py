@@ -10,7 +10,7 @@ All rights reserved.
 #%%
 import  numpy as np
 import torch
-from tqdm import tqdm
+from tqdm import trange
 from Octree import DeOctree, dec2bin
 import pt 
 from dataset import default_loader as matloader
@@ -18,117 +18,115 @@ from collections import deque
 import os 
 import time
 from networkTool import *
-from encoderTool import generate_square_subsequent_mask
-from encoder import model,list_orifile
+from encoder import shared_backbone,module_a,module_b,list_orifile
 import numpyAc
+from EHEM import ntokens
 batch_size = 1 
 bpttRepeatTime = 1
 #%%
-'''
-description: decode bin file to occupancy code
-param {str;input bin file name} binfile
-param {N*1 array; occupancy code, only used for check} oct_data_seq
-param {model} model
-param {int; Context window length} bptt
-return {N*1,float}occupancy code,time
-'''
-def decodeOct(binfile,oct_data_seq,model,bptt):
-    """
-    从二进制文件中解码八叉树的占用码（occupancy code）
-    oct_data_seq 为ground truth
-    oct_seq 为解码结果
-    """
 
-    model.eval()
+def concate(list1, list2):
+    """
+    将两个列表交替合并。
+    """
+    output_list = []
+    len1, len2 = len(list1), len(list2)
+    max_len = max(len1, len2)
+
+    for i in range(max_len):
+        if i < len1:
+            output_list.append(list1[i])
+        if i < len2:
+            output_list.append(list2[i])
+
+    return output_list
+
+def entropy_model(KfatherNode,dec,shared_backbone,module_a,module_b):
+    """
+    模拟熵模型的输出，返回预测的概率分布。
+    """
+    shared_backbone.eval()
+    module_a.eval()
+    module_b.eval()
+
     with torch.no_grad():
-        elapsed = time.time()
+        xi = []
+        data = torch.tensor(KfatherNode).to(device)
+        for left in range(0,data.shape[0],bptt):
+                if left + bptt >= data.shape[0]:
+                    right = data.shape[0]
+                else:
+                    right = left + bptt
+                input = data[left:right,:,:,:]
+                length2 = input.shape[0]//2
+                features , _ = shared_backbone(input)
+                
+                if length2 == 0:
+                    output_xi1 = module_a(features)
+                    xi.append(decodeNode(output_xi1,dec))
+                else:
+                    output_xi1 = module_a(features)
+                    xi1 = torch.tensor(decodeNode(output_xi1,dec)).to(device) 
+                    output_xi2 = module_b(features,xi1-1)
+                    xi2 = decodeNode(output_xi2,dec)
+                    xi.append(concate(xi1.cpu().detach().numpy().tolist(),xi2))
+                    
+        return np.concatenate(xi, axis=0)
 
-        KfatherNode = [[255,0,0]]*levelNumK # # 初始化 K 级父节点
-        nodeQ = deque()
-        oct_seq = [] # 存储解码后的 occupancy code
-        src_mask = generate_square_subsequent_mask(bptt).to(device)
+def decodeNode(pro_batch,dec):
+    pro_batch = torch.softmax(pro_batch.squeeze(0),-1).cpu().detach().numpy()
+    num_nodes = pro_batch.shape[0]
+    roots = []
+    for i in range(num_nodes):
+        pro = pro_batch[i, :]  # 获取单个节点的概率分布
+        root = dec.decode(np.expand_dims(pro, 0)) # 仍然调用单符号解码
+        roots.append([root + 1])
+    return np.concatenate(roots)
 
-        input = torch.zeros((bptt,batch_size,levelNumK,3)).long().to(device)
-        padinginbptt = torch.zeros((bptt,batch_size,levelNumK,3)).long().to(device)
-        bpttMovSize = bptt//bpttRepeatTime
-        # input torch.Size([256, 32, 4, 3]) bptt,batch_sz,kparent,[oct,level,octant]
-        # all of [oct,level,octant] default is zero
 
-        output = model(input,src_mask,[])
+def decodeOct(binfile,oct_data_seq,shared_backbone,module_a,module_b,Lmax=11):
+    # 初始化根节点
+    KfatherNode = [[254, 0, 0, 0, 0, 0]] * 3 + [[255, 1, 1, 0, 0, 0]]
+    current_layer_nodes = [[KfatherNode]]
+    parent_coords = [[np.array([0, 0, 0])]]  # 根节点坐标
+    oct_len = len(oct_data_seq)
+    dec = numpyAc.arithmeticDeCoding(None,oct_len,255,binfile)
+    nodeID = 0
 
-        # 初始化解码
-        freqsinit = torch.softmax(output[-1],1).squeeze().cpu().detach().numpy()
+    elapsed = time.time()
+    for layer_num in range(2,Lmax):
+        print(f"Current level:{layer_num}")
+
+        # 通过熵模型预测layer_num - 1的占用 [num_node,255]
+        # 并且构建layer_num的输入
+        # current layer nodes 为num nodes个 4*6的列表组成
+        outputs = entropy_model(current_layer_nodes,dec,shared_backbone,module_a,module_b)
+        next_layer_nodes = []
+        tmp_coords = []
         
-        oct_len = len(oct_data_seq)
+        assert outputs[0] == oct_data_seq[nodeID]
+        nodeID += len(outputs)
 
-        # 创建算术解码器，最大值 255 oct_len表示总共需要解码多少个 occupancy code
-        dec = numpyAc.arithmeticDeCoding(None,oct_len,255,binfile)
+        for i in trange(len(outputs)):  
+            output = outputs[i]          
+            # 通过 DeOctree 获取父节点所有的子节点的八叉象限和坐标
+            child_coords, child_octants,num_nodes = DeOctree([output], parent_coords[i], layer_num, Lmax)
 
-        root =  decodeNode(freqsinit,dec)
-        nodeId = 0
-        
-        KfatherNode = KfatherNode[3:]+[[root,1,1]] + [[root,1,1]] # for padding for first row # ( the parent of root node is root itself)
-        
-        nodeQ.append(KfatherNode) 
-        oct_seq.append(root) #decode the root  
-        
-        with tqdm(total=  oct_len+10) as pbar:
-            while True:
-                father = nodeQ.popleft()
-                # 解析当前父节点的占用码（0-255）为二进制列表（8位，表示8个子节点的占用情况）
-                childOcu = dec2bin(father[-1][0]) 
-                # 使其按照 子节点顺序（0-7） 进行遍历
-                childOcu.reverse()
-                # 获取当前父节点的层级（深度）
-                faterLevel = father[-1][1] 
-                for i in range(8):
-                    if(childOcu[i]):
-                        # root 是 当前子节点编号
-                        # faterLevel+1 表示它的层级，子节点层级比父节点高一级
-                        # i+1 表示 它是父节点的第几个子节点（1-8）
-                        faterFeat = [[father+[[root,faterLevel+1,i+1]]]] 
-                        # Fill in the information of the node currently decoded [xi-1, xi level, xi octant]
-                        faterFeatTensor = torch.Tensor(faterFeat).long().to(device)
-                        # # root 需要 -1 处理，使其变为 0-indexed（原始 root 在 decodeNode 里加了 1）
-                        faterFeatTensor[:,:,:,0] -= 1
+            # current layer nodes 为num child nodes个 4*6的列表组成
+            current_layer_node = current_layer_nodes[i][0]
+            # 更新父节点的占用情况
+            current_layer_node[3][0] = output - 1  
 
-                        # shift bptt window
-                        offsetInbpttt = (nodeId)%(bpttMovSize) # the offset of current node in the bppt window
-                        # model 看到的是 bpttMovSize 个 node
-                        if offsetInbpttt==0: # a new bptt window
-                            input = torch.vstack((
-                                input[bpttMovSize:],  # 滑动窗口：丢弃 bpttMovSize 个旧数据
-                                faterFeatTensor,  # 添加当前解码的 faterFeatTensor
-                                padinginbptt[0:bpttMovSize-1]  # 添加 bpttMovSize-1 个 padding 数据
-                            ))
-                        else:
-                            # 添加当前解码的 faterFeatTensor
-                            input[bptt-bpttMovSize+offsetInbpttt] = faterFeatTensor
+            for i in range(num_nodes):
+                next_layer_nodes.append([current_layer_node[1:]+ [[255, layer_num, child_octants[i], *child_coords[i].tolist()[0]]]])
+            
+            tmp_coords.append(child_coords)
 
-                        # 在一个bpttMovSize中，input中node的数量从1->bpttMovSize
-                        output = model(input,src_mask,[])
-                        
-                        Pro = torch.softmax(output[offsetInbpttt+bptt-bpttMovSize],1).squeeze().cpu().detach().numpy()
-
-                        root =  decodeNode(Pro,dec)
-                        nodeId += 1
-                        pbar.update(1)
-                        # 构造新的子节点信息
-                        KfatherNode = father[1:]+[[root,faterLevel+1,i+1]]
-                        nodeQ.append(KfatherNode)
-                        if(root==256 or nodeId==oct_len):
-                            assert len(oct_data_seq) == nodeId # for check oct num
-                            # 记录最终的八叉树序列
-                            Code = oct_seq
-                            return Code,time.time() - elapsed
-                        oct_seq.append(root)
-                    assert oct_data_seq[nodeId] == root # for check
-
-def decodeNode(pro,dec):
-    # dec.decode() 负责从 pro 的概率分布中解码出一个整数 root，表示当前八叉树节点的占用码（occupancy code）
-    root = dec.decode(np.expand_dims(pro,0))
-    return root+1
-
+        tmp_coords = np.concatenate(tmp_coords, axis=0)
+        # 更新子节点的特征信息和坐标信息 作为下一层的输入
+        current_layer_nodes = next_layer_nodes
+        parent_coords = tmp_coords
+    return parent_coords.squeeze(1),time.time() - elapsed
 
 if __name__=="__main__":
 
@@ -146,12 +144,8 @@ if __name__=="__main__":
         qs = mat[cell[2,0]]['qs'][0]
 
         # (N, 1) 矩阵：祖先的占用代码（0-255）
-        Code,elapsed = decodeOct(binfile,oct_data_seq,model,bptt)
+        ptrec,elapsed = decodeOct(binfile,oct_data_seq,shared_backbone,module_a,module_b)
         print('decode succee,time:', elapsed)
-        print('oct len:',len(Code))
-
-        # DeOctree
-        ptrec = DeOctree(Code)
         # Dequantization
         DQpt = (ptrec*qs+offset)
         pt.write_ply_data(expName+"/temp/test/rec.ply",DQpt)

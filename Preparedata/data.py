@@ -44,18 +44,6 @@ def dataPrepare(fileName,saveMatDir='Data',qs=1,ptNamePrefix='',offset='min',qle
     # 生成八叉树结构
     code,Octree,QLevel = GenOctree(pt) 
     
-    # 生成祖先序列
-    # Seq：(nodeNum, K) 的NumPy数组 其中nodeNum为八叉树节点的数量
-    # 每个元素包含其一个祖先/自己的编码（0-255）
-
-    # Level: 一个形状为 (nodeNum, K, 2) 的NumPy数组。存储每个节点每个祖先的层级和卦限信息
-    # LevelOctant[i, j, 0] 包含节点 i 的祖先 j 的层级编号（从 1 开始）。i==j时就是自己的level
-    # LevelOctant[i, j, 1] 包含该祖先在其父节点中的卦限编号（1-8）
-
-
-    # ChildID: 记录每个节点的 子节点 ID。
-
-    # Pos: 一个形状为 (nodeNum, K, 3) 的NumPy数组。它存储每个节点每个祖先的3D坐标
     DataSturct = GenKparentSeq(Octree,4) 
     
     ptcloud = {'Location':refPt}

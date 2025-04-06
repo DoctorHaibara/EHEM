@@ -8,7 +8,8 @@ __pycache__
 /.idea
 /.*
 /log
-/Exp
+/Exp/Obj/data
+encoderPLY.txt
 /Data
 /temp
 *.ply
@@ -16,5 +17,7 @@ __pycache__
 *.docx
 *.pdf
 *.mp4
+*.png
+file/MPEG8iVFBv2
 Counts.txt
 rename_files.sh
