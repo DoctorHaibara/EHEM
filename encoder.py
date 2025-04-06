@@ -15,10 +15,12 @@ import pt as pointCloud
 ## decoder.py relys on this model here
 ## do not move this lines to somewhere else
 model = model.to(device)
-saveDic = reload(None,'modelsave/obj/encoder_epoch_00800093.pth')
+saveDic = reload(None,'Exp/Obj/checkpoint/encoder_epoch_00200100.pth')
 model.load_state_dict(saveDic['encoder'])
 ###########Objct##############
-list_orifile = ['file/Ply/2851.ply']
+list_orifile = ['Data/Obj/test/MPEG8iVFBv2/1019.ply',
+                'Data/Obj/test/MPEG8iVFBv2/1450.ply'
+                ,'Data/Obj/test/MPEG8iVFBv2/1464.ply']
 if __name__=="__main__":
     printl = CPrintl(expName+'/encoderPLY.txt')
     printl('_'*50,'EHEM V0.4','_'*50)

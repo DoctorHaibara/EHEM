@@ -21,20 +21,28 @@ def makedFile(dir):
 if __name__=="__main__":
 
 ######For MPEG,MVUB######    
-    oriDir = 'file/Ply/loot/Ply/*.ply'
-    outDir = 'Data/Obj/train/'
+    # 300/300 frames in soldier10 and longdress10 for training.
+    # 300/300 frames in loot10 and redandblack10 for testing.
+    oriDirs = ['Data/Obj/test/MPEG8iVFBv2/1000.ply']
+    outDir = 'Data/Obj/test/MPEG8iVFBv2'
     ptNamePrefix = 'MPEG_' # 'MVUB_'
 
     printl = CPrintl('Preparedata/makedFileObj.log')
-    makeFileList = makedFile(outDir+'*.mat')
-    fileList = sorted(glob.glob(oriDir))
-    for n,file in enumerate(fileList):
-        fileName = file.split('/')[-1][:-4]
-        dataName = outDir+ptNamePrefix+fileName+'.mat'
-        if dataName in makeFileList:   
-            print(dataName,'maked!')
-            continue
-        dataPrepare(file,saveMatDir=outDir,ptNamePrefix=ptNamePrefix,offset=0,rotation=False)
-        # please set `rotation=True` in the `dataPrepare` function when processing MVUB data
-        if n%10==0:
-            printl(dataName)
+    for oriDir in oriDirs:
+        makeFileList = makedFile(outDir+'*.mat')
+        fileList = sorted(glob.glob(oriDir))
+        for n,file in enumerate(fileList):
+            fileName = file.split('/')[-1][:-4]
+
+            # 检查文件名结尾数字是否是0或5
+            if fileName[-1] not in ['0', '5']:
+                continue
+            
+            dataName = outDir+ptNamePrefix+fileName+'.mat'
+            # if dataName in makeFileList:   
+            #     print(dataName,'maked!')
+            #     continue
+            dataPrepare(file,saveMatDir=outDir,ptNamePrefix=ptNamePrefix,offset=0,rotation=False)
+            # please set `rotation=True` in the `dataPrepare` function when processing MVUB data
+            if n%10==0:
+                printl(dataName)

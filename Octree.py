@@ -90,8 +90,8 @@ def GenKparentSeq(Octree, K):
     Pos = np.zeros((nodeNum, K, 3), 'int')  # 记录坐标信息
     ChildID = [[] for _ in range(nodeNum)]  # 存储子节点 ID
     Seq[0, K-1] = Octree[0].node[0].oct  # 初始化根节点
-    LevelOctant[0, K-1, 0] = 1  # 根节点的层级
-    LevelOctant[0, K-1, 1] = 1  # 根节点的象限
+    LevelOctant[0, K-1, 0] = 1  # 根节点的层级 0 0 0 1
+    LevelOctant[0, K-1, 1] = 1  # 根节点的象限 0 0 0 1
     Pos[0, K-1, :] = Octree[0].node[0].pos  # 根节点的位置
     Octree[0].node[0].parent = 1  # 设置根节点父节点
     n = 0 

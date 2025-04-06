@@ -101,7 +101,7 @@ if __name__=="__main__":
 
     TreePoint = 4096*16 # the number of the continuous occupancy code in data, TreePoint*batch_size divisible by batchSize
     batchSize = 32
-    train_set = DataFolder(root=trainDataRoot, TreePoint=TreePoint,transform=None,dataLenPerFile=356484.1) # will load (batch_size,TreePoint,...) shape data
+    train_set = DataFolder(root=trainDataRoot, TreePoint=TreePoint,transform=None,dataLenPerFile=358181.855) # will load (batch_size,TreePoint,...) shape data
     train_loader = data.DataLoader(dataset=train_set, batch_size=1, shuffle=True, num_workers=4,drop_last=True)
     print('total octrees(TreePoint*7): {}; total batches: {}'.format(len(train_set), len(train_loader)))
     train_set.calcdataLenPerFile()

@@ -20,7 +20,7 @@ DataRoot = './Data/Obj'
 checkpointPath = expName+'/checkpoint'
 levelNumK = 4
 
-trainDataRoot = DataRoot+"/train/*.mat" # DON'T FORGET RUN ImageFolder.calcdataLenPerFile() FIRST
+trainDataRoot = DataRoot+"/train/MPEG8iVFBv2/*.mat" # DON'T FORGET RUN ImageFolder.calcdataLenPerFile() FIRST
 expComment = 'OctAttention, trained on MPEG 8i,MVUB 1~10 level. 2021/12. All rights reserved.'
 
 MAX_OCTREE_LEVEL = 12

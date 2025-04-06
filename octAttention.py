@@ -142,6 +142,7 @@ def get_batch(source, i):
     seq_len = min(bptt, len(source) - 1 - i)
     data = source[i:i+seq_len].clone()
     # 目标 target 是 时间步向后移动一位 的 source，用于训练预测下一步的状态
+    print(source[i:i+seq_len,:,-1,0].reshape(-1)[source.shape[1]:source.shape[1]+10])
     target = source[i+1:i+1+seq_len,:,-1,0].reshape(-1)
     # this moves the feat(octant,level) of current node to lastrow,   
     # 整个矩阵的 0:-1 列沿着第一维节点 (N) 进行了 时间序列上的平移，后面的数据覆盖了前面的数据，类似于队列的滚动更新。      
@@ -149,6 +150,7 @@ def get_batch(source, i):
     # which will be used as known feat
     # 确保了 oct_seq 在 最后一列 的 1:3 维度（八叉树层级、象限编号等）也遵循时间序列滚动。
     data[:,:,-1,1:3] = source[i+1:i+seq_len+1,:,-1,1:3]
+    print(target[:10])
     return data[:,:,-levelNumK:,:], (target).long(),[]
 
 
@@ -222,6 +224,8 @@ if __name__=="__main__":
                 if data.size(0) != bptt:
                     src_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
                 output = model(data, src_mask,dataFeat)                         #output: [bptt,batch size,255]
+                print(targets.shape,targets[0:10])
+                exit()
                 loss = criterion(output.view(-1, ntokens), targets)/math.log(2)
                 
                 loss.backward()

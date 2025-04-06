@@ -85,20 +85,20 @@ class EHEM(nn.Module):
         self.decoder1.weight.data = nn.init.xavier_normal_(self.decoder1.weight.data)
 
     def forward(self, src, src_mask = None, dataFeat=None):
-       # src: [bptt, batch_size, K, 6]  (K=4)
+       # src: [bptt, batch_size, K, 6] 
        bptt, batch_size, K, _ = src.shape
 
        # DGCNN 需要输入所有节点的祖辈节点的特征
-       # [bptt, batch, K, feature_dim]->[batch_size, num_points, 3, 6]
-       dgcnn_input = src[:, :, 0:-1, :].permute(1,0,2,3)
+       # [bptt, batch, K, feature_dim]->[batch_size, num_points, 3, 3]
+       dgcnn_input = src[:,:,:,:3].permute(1,0,2,3)
 
        # 将最后两个维度展平为一个维度
        #  -> [batch_size, num_points, num_dims]
-       dgcnn_input = dgcnn_input.view(batch_size, bptt, -1)  
+       dgcnn_input = dgcnn_input.reshape(batch_size, bptt, -1)  
 
        # 2. DGCNN 特征提取
        # [batch_size, num_points, num_dims]->[batch_size*num_points//win_len,num_dims,win_len]
-       dgcnn_input = dgcnn_input.reshape(batch_size*bptt//win_len,win_len,18).permute(0,2,1)
+       dgcnn_input = dgcnn_input.reshape(batch_size*bptt//win_len,win_len,K*3).permute(0,2,1)
 
         # 送入 DGCNN
         # outputs:[batch_size*num_points//win_len = batch, win_len, 512]
@@ -125,7 +125,7 @@ class EHEM(nn.Module):
        
        # 每个节点得到各个编码的分数 [batch_size,bptt//2,ntoken]
        output_xi1 = self.decoder1(self.trans2(Fia_hat.transpose(1,2)).transpose(1,2))
-    
+       
        # 5. 兄弟特征嵌入 
        # [batch_size, bptt//2, ninp]
        xi1_embed = self.embedding_xi1(output_xi1)
@@ -166,6 +166,8 @@ class EHEM(nn.Module):
        # output_xi2 [batch_size,bptt//2,ntoken]
        output_xi2 = self.decoder3(output2)
        
+       combined_xi = torch.stack((output_xi1, output_xi2), dim=2).permute(0, 2, 1, 3)
+       result = combined_xi.reshape(combined_xi.size(0), -1, combined_xi.size(-1))
        return torch.cat([output_xi1,output_xi2],dim=1)
 
 
@@ -222,14 +224,13 @@ class DGCNN(nn.Module):
     def __init__(self, k=20,emb_dims=256,dropout=0.5, output_channels=512):
         super(DGCNN, self).__init__()
         self.k = k
-        
         self.bn1 = nn.BatchNorm2d(64)
         self.bn2 = nn.BatchNorm2d(64)
         self.bn3 = nn.BatchNorm2d(128)
         self.bn4 = nn.BatchNorm2d(256)
         self.bn5 = nn.BatchNorm1d(emb_dims)
 
-        self.conv1 = nn.Sequential(nn.Conv2d(36, 64, kernel_size=1, bias=False),
+        self.conv1 = nn.Sequential(nn.Conv2d(24, 64, kernel_size=1, bias=False),
                                    self.bn1,
                                    nn.LeakyReLU(negative_slope=0.2))
         self.conv2 = nn.Sequential(nn.Conv2d(64*2, 64, kernel_size=1, bias=False),
@@ -252,10 +253,10 @@ class DGCNN(nn.Module):
         
 
     def forward(self, x):
-        # [batch, 18, win_len]
+        # [batch, 24, win_len]
         x = x.float()
         batch_size = x.size(0)
-        # [batch, 36, win_len, k]
+        # [batch, 48, win_len, k]
         x = get_graph_feature(x, k=self.k)
         pass
         
@@ -393,7 +394,7 @@ if __name__=="__main__":
     best_model = None
     batch_size = 128
     TreePoint = bptt*16
-    train_set = dataset.DataFolder(root=trainDataRoot, TreePoint=TreePoint,transform=None,dataLenPerFile= 294625.44) # you should run 'dataLenPerFile' in dataset.py to get this num (17456051.4)
+    train_set = dataset.DataFolder(root=trainDataRoot, TreePoint=TreePoint,transform=None,dataLenPerFile= 358181.855) # you should run 'dataLenPerFile' in dataset.py to get this num (17456051.4)
     train_loader = data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=False, num_workers=4,drop_last=True) # will load TreePoint*batch_size at one time
     
     # loger
