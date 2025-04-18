@@ -33,13 +33,13 @@ Please refer to the following papers for the foundational works:
 
 - OctAttention:
     
-    Fu, C., ​**​et al.​**​ (2022). OctAttention: Octree-based large-scale contexts model for point cloud compression. *Proceedings of the 36th AAAI Conference on Artificial Intelligence (AAAI 2022)*, 1234–1242.
+    Chunyang Fu, Ge Li, Rui Song, Wei Gao, and Shan Liu. 2022. OctAttention: Octree-Based Large-Scale Contexts Model for Point Cloud Compression. AAAI Conference on Artificial Intelligence (AAAI) 36, 1 (2022), 625–633.
     
     [[arXiv]](https://arxiv.org/abs/2202.06028)
     
 - EHEM:
     
-    Song, R., ​**​et al.​**​ (2023). Efficient hierarchical entropy model for learned point cloud compression. *Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR 2023)*, 4567–4576. 
+    Rui Song, Chunyang Fu, Shan Liu, and Ge Li. 2023. Efficient Hierarchical Entropy Model for Learned Point Cloud Compression. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR). 14368–14377.
     
     [[IEEE Xplore]](https://ieeexplore.ieee.org/document/10205051)
     
